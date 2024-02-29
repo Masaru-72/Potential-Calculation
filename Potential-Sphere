@@ -1,0 +1,93 @@
+program integration
+    implicit none
+    integer*8 :: N ! Points sampled on the boundary.
+    integer*8 :: i, j, k 
+    real*8 :: x, y, z, d
+    real*8 :: radius = 1.0d0
+    real*8 :: distance_sum, epsilon, potential, V
+
+    integer :: ierr, rank, processN
+    integer :: counti, countf, count_rate, count_max
+    real(8) :: runtime
+    real(8) :: int_value  ! Declare int_value
+
+    include 'mpif.h'
+    include "sprng_f.h"
+
+    integer :: seed, gentype
+    integer :: stream
+
+    call MPI_INIT(ierr)
+    call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
+    call MPI_COMM_SIZE(MPI_COMM_WORLD, processN, ierr)
+
+    seed = 2131257613
+    gentype = 5
+    call init_sprng(seed, SPRNG_DEFAULT, gentype, stream)
+
+    do k = 2, 6
+        epsilon = 10.0d0**(-k)
+        V = radius / (radius + epsilon)
+        print *, "Epsilon value: ", epsilon
+        print *, "Exact value: ", V
+        do i = 2, 7
+            N = 10**i
+            potential = 0.d0
+            distance_sum = 0.d0
+            do j = 1, N
+                call unif_samp(x, y, z, radius)
+                call distance(x, y, z, d, epsilon)
+                distance_sum = distance_sum + 1.d0 / d
+            end do
+            potential = radius * distance_sum / N
+            print *, "Potential with 10^", i, " steps: ", potential
+        end do
+    end do 
+
+    int_value = potential * (radius + epsilon) / real(N)
+
+    call MPI_REDUCE(int_value, potential, 1, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+
+    if (rank == 0) then
+        print *, "Integral Value: ", potential
+    end if
+
+    call system_clock(countf, count_rate, count_max)
+    runtime = real(countf - counti) / real(count_rate)
+
+    call MPI_FINALIZE(ierr)
+
+end program integration
+
+!! Distance to the fixed point 
+subroutine unif_samp(x, y, z, radius_inf)
+    implicit none
+    real*8, intent(in) :: radius_inf
+    real*8, intent(out) :: x, y, z
+    real*8 :: urnd1, urnd2, phi, R, theta
+    real*8, parameter :: pi = dacos(-1.d0)
+
+    call random_number(urnd1)
+    call random_number(urnd2)
+    R = radius_inf
+    theta = dacos(1.d0 - 2.d0 * urnd1)
+    phi = 2.d0 * pi * urnd2
+
+    x = R * dsin(theta) * dcos(phi)
+    y = R * dsin(theta) * dsin(phi)
+    z = R * dcos(theta)
+end subroutine unif_samp
+
+subroutine distance(x, y, z, d, epsilon)
+    implicit none
+    real*8, intent(in) :: x, y, z, epsilon 
+    real*8 :: x0, y0, z0
+    real*8, intent(out) :: d
+    real*8 :: radius = 1.d0
+
+    x0 = 0.d0
+    y0 = 0.d0
+    z0 = radius + epsilon
+
+    d = dsqrt((x - x0)**2 + (y - y0)**2 + (z - z0)**2)
+end subroutine distance
