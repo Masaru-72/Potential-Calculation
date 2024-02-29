@@ -1,6 +1,6 @@
 program integration
     implicit none
-    integer*8 :: N ! Points sampled on the boundary.
+    integer*8 :: N 
     integer*8 :: i, j, k 
     real*8 :: x, y, z, d
     real*8 :: radius = 1.0d0
@@ -59,7 +59,6 @@ program integration
 
 end program integration
 
-!! Distance to the fixed point 
 subroutine unif_samp(x, y, z, radius_inf)
     implicit none
     real*8, intent(in) :: radius_inf
